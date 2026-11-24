@@ -1,0 +1,5 @@
+Enterprise
+Warehouse
+Rack
+SmartBin
+Asset

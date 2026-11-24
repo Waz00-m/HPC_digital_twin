@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@source './index.html';
+@source './app.js';
+@plugin 'daisyui' { themes: light --default; }
+
+@utility btn { min-height: 2.75rem; }
+@utility range { width: 100%; min-height: 2.75rem; --range-fill: 0; }
+
+@layer base {
+  body { min-width: 0; }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+  ::selection { background: var(--color-primary); color: var(--color-primary-content); }
+  input { caret-color: var(--color-primary); }
+  code { overflow-wrap: anywhere; }
+  summary { cursor: pointer; }
+}
+@layer components {
+  .field { display: grid; min-width: 0; gap: .375rem; font-size: .875rem; font-weight: 500; }
+  .field .input, .field .select { width: 100%; font-weight: 400; min-height: 2.75rem; }
+  .section-title { font-size: 1.125rem; font-weight: 650; margin-bottom: 1rem; }
+  .muted { color: color-mix(in oklab, var(--color-base-content) 75%, var(--color-base-100)); }
+  .bin-meter { height: .375rem; width: 6rem; background: var(--color-base-300); margin-top: .375rem; overflow: hidden; border-radius: .25rem; }
+  .bin-meter span { display: block; height: 100%; background: var(--color-neutral); }
+  .bin-meter span.high { background: var(--color-warning); }
+  .table th { font-size: .875rem; font-weight: 600; }
+  .table td { font-size: .875rem; }
+  .table tr.selected { background: var(--color-base-200); }
+  .table .btn, [data-percent] { min-height: 2.75rem; }
+  .reference-table { min-width: 36rem; }
+  .twin-table { min-width: 47rem; }
+  .twin-table td { vertical-align: top; }
+  .twin-table .badge { height: auto; min-height: 1.5rem; white-space: nowrap; }
+  #twin-summary[data-error=true] { color: color-mix(in oklab, var(--color-error) 55%, var(--color-base-content)); }
+  .reference-table td, .reference-table th { white-space: normal; vertical-align: top; }
+  #controller, #guide { scroll-margin-top: 1rem; }
+  #draft-value { overflow-wrap: anywhere; }
+  details.collapse { min-width: 0; }
+  .collapse-title { min-height: 2.75rem; }
+  #feedback { min-height: 1.5rem; }
+  #feedback[data-error=true] { color: color-mix(in oklab, var(--color-error) 55%, var(--color-base-content)); }
+  #connection[data-status=connected] { color: color-mix(in oklab, var(--color-success) 45%, var(--color-base-content)); }
+  #connection[data-status=connecting] { color: color-mix(in oklab, var(--color-warning) 45%, var(--color-base-content)); }
+}

@@ -1,0 +1,22 @@
+# Installed dependencies and local runtime state
+**/node_modules/
+.runtime/
+**/.data/
+**/.results/
+**/.impeccable/
+*.log
+*.tmp
+
+# Local configuration and editor state
+**/.env
+**/.env.*
+!**/.env.example
+smartbin.properties
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated connection configuration and recorded runs
+mqtt/native-connection.json
+mqtt/native-demo-results.json
+simulator/demo-results.json

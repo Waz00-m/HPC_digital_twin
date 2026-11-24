@@ -1,0 +1,107 @@
+@import '../../simulator/node_modules/tailwindcss/index.css';
+@source './index.html';
+@source './app.js';
+@source './operations.js';
+@plugin '../../simulator/node_modules/daisyui/index.js' { themes: light --default; }
+
+@utility btn { min-height: 2.75rem; }
+@layer base {
+  body { min-width: 0; }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 4px; }
+  ::selection { background: var(--color-primary); color: var(--color-primary-content); }
+  input { caret-color: var(--color-primary); }
+  [hidden] { display: none !important; }
+  h1 { font-size: clamp(1.65rem, 3vw, 2.1rem); font-weight: 650; letter-spacing: -.025em; line-height: 1.2; }
+  h2 { font-size: 1.125rem; font-weight: 650; }
+  code { overflow-wrap: anywhere; }
+}
+@layer components {
+  .muted { color: color-mix(in oklab, var(--color-base-content) 73%, var(--color-base-100)); }
+  .app-header { background: var(--color-neutral); color: var(--color-neutral-content); }
+  .header-inner { max-width: 1440px; margin: auto; padding: 1.25rem 2rem; display: flex; align-items: center; gap: 3rem; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: .75rem; font-size: 1.15rem; font-weight: 650; text-decoration: none; }
+  .brand-sub { display: block; font-size: .875rem; font-weight: 400; margin-top: .125rem; }
+  .main-nav { display: flex; align-items: center; gap: 2rem; }
+  .main-nav a { padding: .625rem 0; font-size: .9375rem; border-bottom: 2px solid transparent; }
+  .main-nav a[aria-current=page] { border-bottom-color: currentColor; font-weight: 650; }
+  .simulator-link { margin-left: auto; font-size: .875rem; text-decoration: underline; text-underline-offset: .25rem; }
+  .page-shell { max-width: 1440px; margin: auto; padding: 2rem; }
+  .page-heading { display: flex; align-items: start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .page-heading p { max-width: 65ch; }
+  .refresh-area { display: grid; grid-template-columns: auto auto; align-items: center; gap: .25rem 1rem; text-align: right; flex-shrink: 0; }
+  .refresh-area .btn { grid-column: 2; grid-row: 1 / 3; }
+  .fleet-summary { display: flex; flex-wrap: wrap; gap: .75rem 1.75rem; padding: 1rem 0; border-top: 1px solid var(--color-base-300); border-bottom: 1px solid var(--color-base-300); font-size: .9375rem; margin-bottom: 1.75rem; }
+  .workspace { display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 2rem; }
+  .filters h2 { margin-bottom: 1rem; font-size: .9375rem; }
+  .warehouse-filters { display: grid; gap: .375rem; }
+  label.mobile-warehouse { display: none; }
+  .status-field { margin-top: 1.5rem; }
+  .warehouse-filter { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: .75rem; border-radius: .5rem; font-size: .9375rem; }
+  .warehouse-filter:hover { background: var(--color-base-300); }
+  .warehouse-filter[aria-pressed=true] { background: var(--color-neutral); color: var(--color-neutral-content); }
+  .field { display: grid; gap: .5rem; min-width: 0; font-size: .875rem; font-weight: 550; }
+  .field .input, .field .select { width: 100%; min-height: 2.75rem; font-weight: 400; }
+  .field input::placeholder { color: color-mix(in oklab, var(--color-base-content) 73%, var(--color-base-100)); opacity: 1; }
+  .warehouse-board { display: grid; gap: 1.25rem; }
+  .warehouse-section { background: var(--color-base-100); border-radius: 12px; padding: 1.25rem 1.5rem; }
+  .warehouse-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+  .warehouse-heading p { font-size: .875rem; }
+  .bin-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .bin-record { min-width: 0; padding: .875rem 1.25rem; text-align: left; border-radius: .375rem; font-variant-numeric: tabular-nums; }
+  .bin-record + .bin-record { border-left: 1px solid var(--color-base-300); }
+  .bin-record:hover { background: var(--color-base-200); }
+  .bin-record[aria-expanded=true] { background: var(--color-base-200); outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .bin-top { display: flex; justify-content: space-between; align-items: center; gap: .625rem; margin-bottom: .625rem; flex-wrap: wrap; }
+  .bin-weight { font-size: 1.9rem; font-weight: 650; letter-spacing: -.025em; line-height: 1.2; }
+  .bin-weight small { font-size: .875rem; font-weight: 400; letter-spacing: 0; }
+  .capacity-meter { height: .5rem; background: var(--color-base-300); position: relative; margin: .875rem 0 .625rem; border-radius: .25rem; }
+  .capacity-meter .fill { height: 100%; border-radius: .25rem; background: var(--color-success); }
+  .capacity-meter .threshold { position: absolute; top: -.25rem; width: 2px; height: 1rem; background: var(--color-base-content); }
+  .bin-record[data-status=attention] .fill { background: var(--color-warning); }
+  .bin-record[data-status=over-capacity] .fill { background: var(--color-error); }
+  .bin-record .badge { white-space: nowrap; font-size: .875rem; }
+  .bin-receipt { font-size: .875rem; margin-top: .5rem; }
+  .detail-panel, .scenario-form-panel, .forecast-panel { background: var(--color-base-100); border-radius: 12px; padding: 1.5rem; }
+  .detail-panel { margin-top: 1.5rem; scroll-margin-top: 1.5rem; }
+  .detail-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.125rem 2rem; margin-top: 1.5rem; font-size: .9375rem; }
+  .detail-list dt { font-size: .875rem; margin-bottom: .375rem; color: color-mix(in oklab, var(--color-base-content) 73%, var(--color-base-100)); }
+  .detail-list dd { overflow-wrap: anywhere; }
+  .connection-error { background: var(--color-error); color: var(--color-error-content); padding: 1rem 1.25rem; border-radius: .625rem; margin-bottom: 1.5rem; }
+  .empty-state { padding: 2rem; background: var(--color-base-100); border-radius: 12px; }
+  .scenario-layout { display: grid; grid-template-columns: minmax(290px,360px) minmax(0,1fr); align-items: start; gap: 1.5rem; }
+  .forecast-empty { padding: 3rem 0; max-width: 55ch; }
+  .saved-drafts { display: grid; gap: .5rem; }
+  .draft-button { display: block; padding: .75rem; text-align: left; width: 100%; border: 1px solid var(--color-base-300); border-radius: .5rem; }
+  .draft-button:hover { background: var(--color-base-200); }
+  .forecast-figure { margin: 1.75rem 0; }
+  #forecast-chart svg { width: 100%; height: auto; min-height: 180px; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .875rem; }
+  .chart-key { display: inline-block; width: 1rem; height: .2rem; margin-right: .375rem; vertical-align: middle; }
+  .table td,.table th { font-size: .875rem; }
+  .forecast-panel .table { min-width: 32rem; }
+  .forecast-panel .table td { white-space: nowrap; }
+  #scenario-feedback[data-error=true] { color: color-mix(in oklab, var(--color-error) 55%, var(--color-base-content)); }
+  .scenario-settings { border-top: 1px solid var(--color-base-300); padding-top: 1rem; }
+  summary { cursor: pointer; font-size: .9375rem; font-weight: 650; padding: .5rem 0; }
+  summary:hover { text-decoration: underline; text-underline-offset: .25rem; }
+  .bin-assumption { min-width: 0; border-top: 1px solid var(--color-base-300); margin-top: 1.5rem; padding-top: .75rem; }
+  .bin-assumption legend { font-size: .875rem; font-weight: 650; padding-top: 1rem; }
+  .bin-assumption-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+  .decision-section { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--color-base-300); }
+  .decision-section h3 { font-weight: 650; font-size: 1.125rem; }
+  .decision-title { font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; line-height: 1.3; margin-top: .875rem; }
+  .table-scroll { overflow-x: auto; max-width: 100%; margin-top: 1rem; scrollbar-color: var(--color-neutral) var(--color-base-200); }
+  .result-notice { background: var(--color-base-200); padding: .75rem; font-size: .875rem; margin-top: 1rem; }
+  .team-schedule { max-height: 25rem; overflow-y: auto; margin-top: 1rem; scrollbar-color: var(--color-neutral) var(--color-base-200); }
+  .team-schedule li { padding: .875rem 0; border-bottom: 1px solid var(--color-base-300); font-size: .9375rem; }
+  .assumption-list { list-style: disc; padding-left: 1.25rem; font-size: .875rem; line-height: 1.6; }
+  .assumption-list li { margin-top: .75rem; }
+  @media (max-width: 560px) { .scenario-form-panel, .forecast-panel { padding: 1.125rem; } .decision-title { font-size: 1.25rem; } }
+  .page-footer { font-size: .875rem; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--color-base-300); color: color-mix(in oklab, var(--color-base-content) 73%, var(--color-base-100)); }
+  @media (max-width: 1100px) { .workspace { grid-template-columns: 160px minmax(0,1fr); gap: 1.25rem; } .bin-record { padding: .75rem; } .bin-weight { font-size: 1.6rem; } .bin-top { flex-direction: column; align-items: flex-start; min-height: 3.75rem; } }
+  @media (max-width: 800px) { .page-heading { flex-direction: column; } .refresh-area { text-align: left; } .scenario-layout { grid-template-columns: minmax(0,1fr); } .workspace { grid-template-columns: minmax(0,1fr); } .filters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; } .filters h2,.warehouse-filters,.filters > p { display: none; } label.mobile-warehouse { display: grid; } .status-field { margin-top: 0; } .main-nav { gap: 1.25rem; } .header-inner { gap: 1.25rem; } .simulator-link { margin-left: 0; } }
+  @media (max-width: 560px) { .page-shell { padding: 1.25rem 1rem; } .header-inner { padding: 1.25rem 1rem; justify-content: space-between; } .main-nav { order: 3; width: 100%; } .bin-grid { grid-template-columns: minmax(0,1fr); } .bin-record { padding: 1rem 0; } .bin-record + .bin-record { border-left: 0; border-top: 1px solid var(--color-base-300); } .bin-top { flex-direction: row; align-items: center; min-height: 1.5rem; } .warehouse-heading { flex-wrap: wrap; gap: .375rem; } .detail-list { grid-template-columns: minmax(0,1fr); } .warehouse-section { padding: 1rem 1.25rem; } .bin-weight { font-size: 1.9rem; } }
+}

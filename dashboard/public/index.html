@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartBin · Warehouse twins</title>
+  <link rel="stylesheet" href="/styles.css"><script defer src="/app.js"></script><script defer src="/operations.js"></script>
+</head>
+<body class="bg-base-200 text-base-content">
+  <header class="app-header">
+    <div class="header-inner">
+      <a href="#overview" class="brand" aria-label="SmartBin warehouse twins home">
+        <svg viewBox="0 0 32 36" width="28" height="32" aria-hidden="true"><path d="M5 8h22l-2 24H7L5 8Zm-2 0h26M11 3h10l2 5M12 14v12m8-12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span>SmartBin <span class="brand-sub">Digital twins</span></span>
+      </a>
+      <nav class="main-nav" aria-label="Dashboard pages"><a href="#overview" id="overview-link" aria-current="page">Warehouses</a><a href="#scenarios" id="scenario-link">Scenario lab</a></nav>
+      <a href="http://127.0.0.1:4318/" target="_blank" rel="noopener" class="simulator-link">Simulator controls</a>
+    </div>
+  </header>
+  <main class="page-shell">
+    <div id="connection-error" class="connection-error" role="alert" hidden></div>
+    <section id="overview-page" aria-labelledby="page-title">
+      <div class="page-heading">
+        <div><h1 id="page-title">Warehouse overview</h1><p class="muted mt-2">Your bins, as received by Ditto. Select a bin to inspect its model.</p></div>
+        <div class="refresh-area"><p id="transport-status" class="font-semibold text-sm">Checking native MQTT…</p><p id="read-time" class="text-sm muted">Waiting for Ditto</p><button id="refresh" class="btn btn-sm" type="button">Refresh</button></div>
+      </div>
+      <div id="fleet-summary" class="fleet-summary" role="status" aria-live="polite">Loading warehouse records…</div>
+      <div class="workspace">
+        <aside class="filters" aria-label="Filter the warehouse overview">
+          <h2>Warehouses</h2><div id="warehouse-filters" class="warehouse-filters"></div>
+          <label class="field mobile-warehouse">Warehouse<select id="warehouse-select" class="select"><option value="">All warehouses</option></select></label>
+          <label class="field status-field">Weight status<select id="status-filter" class="select"><option value="">All statuses</option><option value="normal">Normal</option><option value="attention">Needs attention</option><option value="over-capacity">Over capacity</option><option value="awaiting-reading">Awaiting reading</option><option value="other">Model / identity issue</option></select></label>
+          <p class="text-sm muted mt-6">Percentages measure rated <strong>weight</strong>, not occupied space.</p>
+          <p class="text-sm muted mt-3">Values refresh every 3 seconds. Last receipt time describes the reading, not whether a bin is online.</p>
+        </aside>
+        <div class="min-w-0">
+          <div id="warehouse-board" class="warehouse-board"></div>
+          <p id="empty-state" class="empty-state" hidden>No bins match these filters.</p>
+          <section id="bin-detail" class="detail-panel" aria-labelledby="detail-title" hidden>
+            <div class="flex items-start justify-between gap-4"><h2 id="detail-title">Bin details</h2><button id="close-detail" class="btn btn-sm" type="button">Close details</button></div>
+            <div id="detail-body"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+    <section id="scenario-page" aria-labelledby="scenario-title" hidden>
+      <div class="page-heading"><div><h1 id="scenario-title">Scenario lab</h1><p class="muted mt-2">Which bin needs the team next? Compare handling decisions while all nine bins keep changing.</p></div><span class="badge badge-outline">Snapshot simulation</span></div>
+      <div class="scenario-layout">
+        <section class="scenario-form-panel" aria-labelledby="draft-title">
+          <h2 id="draft-title">One team. Competing bins.</h2>
+          <form id="scenario-form" class="grid gap-4 mt-5">
+            <label class="field">Scenario name<input id="scenario-name" class="input" value="Nine bins · one handling team" maxlength="80" required></label>
+            <label class="field">Warehouse<select id="scenario-warehouse" class="select"><option value="">All warehouses</option></select></label>
+            <div class="grid grid-cols-2 gap-3"><label class="field">Duration (min)<input id="scenario-horizon" class="input" type="number" value="60" min="5" max="240" step="0.25" required></label><label class="field">Delay to test (min)<input id="scenario-delay" class="input" type="number" value="10" min="0" max="240" step="0.25" required></label></div>
+            <div class="grid grid-cols-2 gap-3"><label class="field">Between warehouses (min)<input id="scenario-travel" class="input" type="number" value="3" min="0.25" max="60" step="0.25" required></label><label class="field">Within warehouse (min)<input id="scenario-local" class="input" type="number" value="0.5" min="0.25" max="60" step="0.25" required></label></div>
+            <p class="text-sm muted">One team starts in the first selected warehouse. Every trip and service occupies it; other bins continue changing.</p>
+            <details class="scenario-settings"><summary>Bin purposes &amp; demand <span id="bin-config-count"></span></summary><p class="text-sm muted mt-3">Collection fills until emptied; inventory is consumed until replenished. Rates and service times below are editable demo assumptions.</p><div id="bin-configs"></div></details>
+            <details class="scenario-settings"><summary>Demand burst &amp; uncertainty</summary><div class="grid gap-4 mt-4">
+              <label class="field">Demand pattern<select id="scenario-pattern" class="select"><option value="burst">Twofold burst for all bins</option><option value="steady">Steady demand</option></select></label>
+              <div class="grid grid-cols-2 gap-3"><label class="field">Burst starts (min)<input id="burst-start" class="input" type="number" value="20" min="0" max="240" step="0.25" required></label><label class="field">Burst lasts (min)<input id="burst-duration" class="input" type="number" value="10" min="0.25" max="240" step="0.25" required></label></div>
+              <label class="field">Minute-to-minute variation (±%)<input id="scenario-variation" class="input" type="number" value="30" min="0" max="100" required></label>
+              <div class="grid grid-cols-2 gap-3"><label class="field">Synthetic trials<input id="scenario-runs" class="input" type="number" value="20" min="1" max="50" step="1" required></label><label class="field">Repeatable seed<input id="scenario-seed" class="input" type="number" value="42" min="1" max="2147483647" step="1" required></label></div>
+            </div></details>
+            <div class="flex flex-wrap gap-3"><button class="btn btn-primary" id="preview" type="submit">Compare strategies</button><button class="btn" id="save-draft" type="button">Save draft</button></div>
+          </form>
+          <p id="scenario-feedback" class="text-sm mt-4" role="status" aria-live="polite">Waiting for the current Ditto snapshot. Simulations never change live bins.</p>
+          <button id="view-results" class="btn btn-sm mt-3" type="button" hidden>View results</button><div class="border-t border-base-300 mt-6 pt-5"><h3 class="font-semibold">Saved drafts</h3><div id="saved-drafts" class="saved-drafts mt-3"><p class="text-sm muted">No drafts saved yet.</p></div></div>
+        </section>
+        <section class="forecast-panel" aria-labelledby="forecast-title">
+          <h2 id="forecast-title" tabindex="-1">Handling decisions</h2>
+          <div id="preview-empty" class="forecast-empty"><p class="text-lg font-semibold">Handle the right bin before it becomes a problem.</p><p class="muted mt-3">Compare a fixed route, a threshold rule and a rule based on time remaining before full or empty. See the next job, the queue and the cost of starting late.</p><p class="text-sm muted mt-6">Starting weights and capacities come from Ditto. Bin purposes, demand, travel and service times are scenario assumptions. Open the settings to change them.</p></div>
+          <div id="preview-output" hidden>
+            <p id="preview-context" class="text-sm muted mt-3"></p>
+            <p id="result-stale" class="result-notice" hidden>Settings changed. Compare again to update these results.</p>
+            <section class="decision-section" aria-labelledby="next-title"><h3 id="next-title">Next job · least time remaining</h3><div id="next-decision"></div></section>
+            <section class="decision-section" aria-labelledby="delay-title"><h3 id="delay-title">What happens if we wait?</h3><div id="delay-result"></div></section>
+            <section class="decision-section" aria-labelledby="comparison-title"><h3 id="comparison-title">Compare the same workload</h3><p class="text-sm muted mt-2">Nominal demand, including the configured burst. Overflow is rejected collection input; unmet demand is inventory requested after stock runs out. Lower kg is better.</p>
+              <div class="table-scroll" tabindex="0" role="region" aria-label="Strategy comparison table"><table class="table table-sm"><thead><tr><th>Strategy</th><th>Overflow</th><th>Unmet demand</th><th>Bins with loss</th><th>Services</th><th>Team busy</th></tr></thead><tbody id="comparison-rows"></tbody></table></div>
+              <p id="comparison-insight" class="text-sm mt-3"></p>
+            </section>
+            <figure class="forecast-figure"><figcaption class="font-semibold text-sm mb-3">Cumulative overflow + unmet demand (kg)</figcaption><div id="forecast-chart"></div><div id="chart-legend" class="chart-legend"></div></figure>
+            <section class="decision-section" aria-labelledby="trial-title"><h3 id="trial-title">Test the uncertainty</h3><p id="trial-context" class="text-sm muted mt-2"></p><div class="table-scroll" tabindex="0" role="region" aria-label="Synthetic trial comparison"><table class="table table-sm"><thead><tr><th>Strategy</th><th>Trials with any loss</th><th>Mean loss</th><th>90th percentile</th></tr></thead><tbody id="trial-rows"></tbody></table></div></section>
+            <section class="decision-section" aria-labelledby="schedule-title"><h3 id="schedule-title">One team’s schedule</h3><label class="field mt-3">Inspect strategy<select id="result-policy" class="select"><option value="deadline">Least time remaining</option><option value="threshold">Threshold first</option><option value="fixed">Fixed route</option></select></label><div id="team-schedule" class="team-schedule" tabindex="0" role="region" aria-label="Handling team schedule"></div></section>
+            <details class="decision-section"><summary>Per-bin outcomes</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Simulated bin outcomes"><table class="table table-sm"><thead><tr><th>Bin / purpose</th><th>Snapshot → final</th><th>First loss</th><th>Lost kg</th><th>Services</th></tr></thead><tbody id="forecast-rows"></tbody></table></div></details>
+            <details class="decision-section"><summary>Model assumptions &amp; limits</summary><ul id="preview-assumptions" class="assumption-list"></ul></details>
+            <p class="text-sm muted mt-4">Swipe or scroll wide tables to see every column. These are scenario results; live twins stay unchanged.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+    <footer class="page-footer">Development demo · Model capacities and alert settings are illustrative. Live readings and projections are kept separate.</footer>
+  </main>
+</body>
+</html>

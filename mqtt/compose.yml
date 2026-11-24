@@ -1,0 +1,25 @@
+name: smartbin-twin
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1884:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+    networks:
+      ditto:
+        aliases: [smartbin-mqtt]
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "127.0.0.1", "-t", "health/broker", "-n"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    mem_limit: 64m
+volumes:
+  mqtt-data:
+networks:
+  ditto:
+    external: true
+    name: docker_default

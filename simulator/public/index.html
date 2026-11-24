@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SmartBin simulator</title><link rel="stylesheet" href="/styles.css"><script defer src="/app.js"></script>
+</head>
+<body class="bg-base-200 text-base-content">
+  <header class="bg-neutral text-neutral-content px-4 py-4 md:px-8">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div><h1 class="text-2xl font-semibold tracking-tight">SmartBin simulator</h1><p class="text-sm mt-1">Choose a bin. Set its weight. Send a reading.</p></div>
+      <nav class="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="On this page"><a href="#ditto-results" class="underline underline-offset-4">Ditto results</a><a href="#guide" class="underline underline-offset-4">How to use &amp; controls</a></nav>
+    </div>
+  </header>
+  <main class="max-w-7xl mx-auto p-4 md:p-6">
+    <section class="bg-base-100 rounded-box p-4 mb-4" aria-label="Connection">
+      <div class="flex flex-wrap justify-between items-center gap-3">
+        <div><p id="connection" class="font-semibold">Checking connection…</p><p id="connection-message" class="text-sm muted mt-1">Loading the simulator.</p></div>
+        <button class="btn" id="local-connect" data-action>Connect local broker</button>
+      </div>
+    </section>
+    <p id="feedback" role="status" aria-live="polite" class="text-sm mb-4">Loading simulator…</p>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+      <section class="bg-base-100 rounded-box p-5 md:p-6" aria-labelledby="control-title" id="controller">
+        <h2 id="control-title" class="section-title">Set a bin weight</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="field">Warehouse<select class="select" id="warehouse"><option value="">All warehouses</option><option value="warehouse-a">Warehouse A</option><option value="warehouse-b">Warehouse B</option><option value="warehouse-c">Warehouse C</option></select></label>
+          <label class="field">Bin<select class="select" id="bin"><option value="">All bins in selection</option></select></label>
+        </div>
+        <p id="selection-count" class="text-sm muted mt-3">Loading bins…</p>
+        <div class="flex flex-wrap justify-between gap-3 border-y border-base-300 py-3 my-4 text-sm">
+          <p><span class="muted">Simulator now </span><strong id="current-reading" class="tabular-nums">—</strong></p>
+          <p><span class="muted">Capacity </span><strong id="selected-capacity" class="tabular-nums">—</strong></p>
+        </div>
+        <form id="reading-form">
+          <div class="flex flex-wrap items-end justify-between gap-3 mb-5">
+            <div><label for="reading-slider" class="font-semibold">New reading</label><output id="draft-value" for="reading-slider reading unit" aria-live="off" class="block text-2xl font-semibold tabular-nums mt-1">—</output></div>
+            <p id="draft-state" class="text-sm muted">Not sent</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div class="pt-2"><input id="reading-slider" class="range" type="range" min="0" max="100" step="0.1" value="15" aria-describedby="slider-help draft-details">
+              <div class="flex justify-between text-xs muted tabular-nums mt-2"><span id="range-min">0 kg</span><span id="range-max">10 kg</span></div>
+            </div>
+            <button class="btn btn-primary" id="send-reading" type="submit" disabled>Send reading</button>
+          </div>
+          <p id="draft-details" class="text-sm mt-3 tabular-nums">Move the slider to choose a weight.</p>
+          <p id="slider-help" class="text-sm muted mt-1">Moving the slider previews a value. Send reading applies it and publishes once.</p>
+          <p id="send-help" class="text-sm muted mt-2">Connect the broker to send a reading.</p>
+          <div class="flex flex-wrap gap-2 my-4" aria-label="Quick reading presets">
+            <button class="btn btn-sm" type="button" data-percent="0">Empty</button>
+            <button class="btn btn-sm" type="button" data-percent="25">25%</button>
+            <button class="btn btn-sm" type="button" data-percent="50">50%</button>
+            <button class="btn btn-sm" type="button" data-percent="85">85%</button>
+            <button class="btn btn-sm" type="button" data-percent="100">Full</button>
+          </div>
+          <details id="entry-options" class="collapse collapse-arrow border-t border-base-300 mt-4">
+            <summary class="collapse-title px-0 font-medium">Exact values &amp; slider options</summary>
+            <div class="collapse-content px-0">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="field"><span id="reading-label">Exact weight (kg)</span><input class="input" id="reading" type="number" min="0" max="2000000" step="0.001" value="1.5" required></label>
+            <label class="field">Entry unit<select class="select" id="unit"><option value="kg">Kilograms</option><option value="percent">% of each bin's capacity</option></select></label>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-3 mt-4 text-sm">
+            <label class="flex items-center gap-2 min-h-11"><input id="overload" class="checkbox checkbox-sm" type="checkbox">Extend slider to 200%</label>
+          </div>
+            </div>
+          </details>
+        </form>
+        <details class="collapse collapse-arrow border-t border-base-300 mt-5">
+          <summary class="collapse-title px-0 font-medium">Automatic scenarios</summary>
+          <div class="collapse-content px-0">
+            <p id="run-status" class="text-sm font-semibold mb-3">Automatic publishing paused</p>
+            <form id="scenario-form" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="field">Scenario<select class="select" id="mode"><option value="manual">Hold current weight</option><option value="filling">Gradually fill</option><option value="draining">Gradually empty</option><option value="cycle">Fill, empty &amp; repeat</option><option value="noisy">Fluctuating readings</option></select></label>
+              <label class="field">Rate (kg per minute)<input class="input" id="rate" type="number" value="1" min="0" max="1000000" step="0.001" required></label>
+              <button class="btn sm:col-span-2" type="submit" data-action>Apply scenario to selection</button>
+            </form>
+            <div class="flex flex-wrap gap-2 mt-3"><button class="btn" id="start" data-action disabled>Start auto-send for all bins</button><button class="btn" id="pause" data-action disabled>Pause auto-send</button></div>
+            <p class="text-sm muted mt-3">Apply a scenario, then start auto-send. All reporting bins publish at the chosen interval. Sending a manual reading changes the selected bins to Hold.</p>
+          </div>
+        </details>
+      </section>
+      <section class="bg-base-100 rounded-box p-5 md:p-6 min-w-0" aria-labelledby="fleet-title">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-2"><h2 id="fleet-title" class="section-title mb-0">Your bins</h2><button class="btn btn-sm" id="export">Export fleet</button></div>
+        <p class="text-sm muted mb-4">Select a bin to control it. Weights shown here are simulator values.</p>
+        <div class="overflow-x-auto"><table class="table table-sm"><caption class="sr-only">Current bin weights, capacities, scenarios and reporting status</caption><thead><tr><th>Bin</th><th>Weight / capacity</th><th>Mode / reporting</th><th><span class="sr-only">Select bin</span></th></tr></thead><tbody id="bins"></tbody></table></div>
+        <p id="stats" class="text-xs muted border-t border-base-300 pt-4 mt-3 tabular-nums">No messages sent yet.</p>
+      </section>
+    </div>
+    <section id="ditto-results" class="bg-base-100 rounded-box p-5 md:p-6 mt-6"><h2 class="section-title">View the digital twins</h2><p class="text-sm muted">The separate dashboard reads weights and model-based alerts directly from Ditto.</p><a class="btn mt-4" href="http://127.0.0.1:4321/" target="_blank" rel="noopener">Open warehouse dashboard</a></section>
+    <section class="mt-6 grid gap-3" aria-label="Settings and activity">
+      <details class="collapse collapse-arrow bg-base-100 rounded-box">
+        <summary class="collapse-title font-semibold">MQTT connection settings</summary>
+        <div class="collapse-content">
+          <form id="broker-form" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <label class="field md:col-span-2">Broker URL<input class="input" id="broker-url" required value="mqtt://127.0.0.1:1884" autocomplete="off"></label>
+            <label class="field">Topic prefix<input class="input" id="prefix" required value="smartbin" maxlength="100"></label>
+            <label class="field">Username (optional)<input class="input" id="username" autocomplete="off"></label>
+            <label class="field">Password (optional)<input class="input" type="password" id="password" autocomplete="off"></label>
+            <label class="field">Payload format<select class="select" id="format"><option value="number">Weight only, in kg</option><option value="json">JSON with identity and timestamp</option></select></label>
+            <label class="field">Send interval (seconds)<input class="input" id="interval" type="number" min="0.25" max="60" step="0.25" value="1" required></label>
+            <div class="flex items-end flex-wrap gap-2 md:col-span-2"><button class="btn" type="submit" data-action>Apply &amp; connect</button><button class="btn" type="button" id="disconnect" data-action>Disconnect</button></div>
+            <p class="text-sm muted md:col-span-3">Example topic: <code id="topic-example">smartbin/warehouse-a/bin-001/weight</code>. Changing the connection pauses auto-send.</p>
+          </form>
+        </div>
+      </details>
+      <details class="collapse collapse-arrow bg-base-100 rounded-box">
+        <summary class="collapse-title font-semibold">More bin controls &amp; fleet setup</summary>
+        <div class="collapse-content grid gap-5">
+          <div><p class="text-sm font-medium mb-3">Selected bins</p><div class="flex flex-wrap gap-2"><button class="btn" id="apply-reading" data-action>Apply reading locally</button><button class="btn" id="publish" data-action>Resend current reading</button><button class="btn" id="silence" data-action>Silence selection</button><button class="btn" id="restore" data-action>Restore reporting</button></div><p class="text-sm muted mt-2">Apply locally changes simulator values without sending. Silent bins send no messages.</p></div>
+          <form id="capacity-form" class="flex flex-wrap gap-3 items-end"><label class="field">Simulator capacity (kg)<input class="input" id="capacity" type="number" min="0.001" max="1000000" step="0.001" value="10" required></label><button class="btn" type="submit" data-action>Apply capacity to selection</button><p class="text-sm muted basis-full">This changes simulator configuration. Update the ontology and reimport separately to change capacities in Ditto.</p></form>
+          <form id="fleet-form" class="flex flex-wrap items-end gap-3 border-t border-base-300 pt-5"><label class="field">Number of bins<input class="input w-32" id="count" type="number" value="9" min="1" max="1000" step="1" required></label><button class="btn" type="submit" data-action>Replace fleet</button><button class="btn" type="button" id="hundred" data-action>Create 100 bins</button><button class="btn" type="button" id="reset" data-action>Empty all &amp; pause</button></form>
+          <p class="text-sm muted">Pause before replacing the fleet; replacement resets weights and scenarios. Empty all changes the local fleet without publishing. New simulated bins need their own Ditto import.</p>
+        </div>
+      </details>
+      <details class="collapse collapse-arrow bg-base-100 rounded-box">
+        <summary class="collapse-title font-semibold">Sent readings &amp; MQTT activity</summary>
+        <div class="collapse-content">
+          <p class="text-sm muted mb-4">Latest 60 attempts. A broker acknowledgement confirms MQTT receipt. It does not confirm a Ditto update.</p>
+          <p id="empty-log" class="text-sm py-4 muted">Send a reading to see its topic, payload and result here.</p>
+          <div class="overflow-x-auto max-h-96"><table class="table table-sm"><caption class="sr-only">Recent MQTT publish attempts</caption><thead><tr><th>Time</th><th>Topic / payload</th><th>Result</th></tr></thead><tbody id="messages"></tbody></table></div>
+        </div>
+      </details>
+    </section>
+    <section id="guide" class="bg-base-100 rounded-box p-5 md:p-6 mt-6 scroll-mt-4" aria-labelledby="guide-title">
+      <h2 id="guide-title" class="section-title">How to operate the simulator</h2>
+      <ol class="list-decimal pl-5 grid gap-2 text-sm max-w-3xl"><li>Connect the local broker once. Wait for <strong>Ready to send</strong>.</li><li>Choose a warehouse and bin, or select a group.</li><li>Move the slider, choose a preset, or enter an exact value. The preview is a draft.</li><li>Press <strong>Send reading</strong>. The simulator applies the new value and sends it once over MQTT.</li><li>Open <strong>Sent readings &amp; MQTT activity</strong> to inspect what was sent. With Ditto healthy and its native MQTT connection running, the matching bin's load feature is updated.</li></ol>
+      <p class="text-sm muted mt-4">For a group, percentage mode respects each bin's capacity: 50% gives 5 kg, 25 kg and 50 kg for 10 kg, 50 kg and 100 kg bins. These are weight percentages, not volume measurements.</p>
+      <details class="collapse collapse-arrow border-t border-base-300 mt-5">
+        <summary class="collapse-title px-0 font-semibold">Variables: what each value means</summary>
+        <div class="collapse-content px-0 overflow-x-auto"><table class="table table-sm reference-table"><thead><tr><th>Variable</th><th>Meaning</th><th>How it changes</th></tr></thead><tbody>
+          <tr><td><code>id / binId</code></td><td>Unique bin identity, such as bin-001</td><td>Assigned when the fleet is generated</td></tr>
+          <tr><td><code>warehouseId</code></td><td>Warehouse containing the bin</td><td>Assigned across A, B and C when generating</td></tr>
+          <tr><td>Draft reading</td><td>Proposed new weight; not applied or sent yet</td><td>Slider, preset or exact-value input</td></tr>
+          <tr><td><code>weightKg</code></td><td>Current simulated load in kilograms</td><td>Send reading, Apply locally or a running scenario</td></tr>
+          <tr><td><code>capacityKg</code></td><td>Configured maximum load</td><td>More bin controls; demo values are 10 / 50 / 100 kg</td></tr>
+          <tr><td>Weight percentage</td><td><code>100 × weightKg / capacityKg</code></td><td>Calculated; 85% is a display highlight</td></tr>
+          <tr><td><code>mode</code></td><td>Hold, filling, draining, cycle or fluctuating</td><td>Apply scenario; manual readings switch to Hold</td></tr>
+          <tr><td><code>rateKgPerMinute</code></td><td>Speed of filling, draining or cycling</td><td>Automatic scenarios; fluctuating mode uses its own bounded random walk</td></tr>
+          <tr><td><code>online</code></td><td>Whether a bin can publish; this is simulated reporting status</td><td>Silence / Restore reporting</td></tr>
+          <tr><td><code>intervalMs</code></td><td>Delay between automatic sends</td><td>Send interval in MQTT settings (seconds in the form)</td></tr>
+          <tr><td><code>brokerUrl / prefix / format</code></td><td>Destination, topic prefix and numeric or JSON payload</td><td>MQTT connection settings</td></tr>
+          <tr><td><code>running / count</code></td><td>Auto-send state and number of virtual bins</td><td>Start / Pause and Replace fleet</td></tr>
+          <tr><td><code>lastPublishedAt / published</code></td><td>Last successful send time and successful-send count per bin</td><td>Read-only; updated after broker acknowledgement</td></tr>
+          <tr><td><code>sent / failed</code></td><td>Global broker acknowledgements and failed attempts</td><td>Read-only counters for this server session</td></tr>
+        </tbody></table></div>
+      </details>
+      <details class="collapse collapse-arrow border-t border-base-300">
+        <summary class="collapse-title px-0 font-semibold">Actions: what changes and what gets sent</summary>
+        <div class="collapse-content px-0 overflow-x-auto"><table class="table table-sm reference-table"><thead><tr><th>Action</th><th>Scope</th><th>Result</th></tr></thead><tbody>
+          <tr><td>Move slider / choose preset</td><td>Draft for selected bins</td><td>Preview only; press Send reading to apply and publish</td></tr>
+          <tr><td>Send reading</td><td>Selected bins</td><td>Set manual weight, then publish once for reporting bins</td></tr>
+          <tr><td>Apply reading locally</td><td>Selected bins</td><td>Set manual weight; no immediate MQTT send</td></tr>
+          <tr><td>Resend current reading</td><td>Selected reporting bins</td><td>Publish the applied simulator weight, not the draft</td></tr>
+          <tr><td>Apply scenario / capacity</td><td>Selected bins</td><td>Change configuration; auto-send retains its current running / paused state</td></tr>
+          <tr><td>Start auto-send</td><td>Entire fleet</td><td>Advance scenarios and publish all reporting bins at the interval</td></tr>
+          <tr><td>Pause auto-send</td><td>Entire fleet</td><td>Freeze scenarios and automatic sends; manual Send still works</td></tr>
+          <tr><td>Silence / Restore</td><td>Selected bins</td><td>Stop / allow reporting; no offline message is emitted</td></tr>
+          <tr><td>Connect / Disconnect</td><td>Entire simulator</td><td>Change the MQTT connection; automatic publishing pauses</td></tr>
+          <tr><td>Replace fleet / Create 100 bins</td><td>Entire fleet</td><td>Replace local bins, weights and scenarios; pause first</td></tr>
+          <tr><td>Empty all &amp; pause</td><td>Entire fleet</td><td>Zero weights, switch to Hold, restore reporting and pause; no immediate send</td></tr>
+          <tr><td>Export fleet</td><td>Entire fleet</td><td>Download a JSON snapshot; does not publish or modify bins</td></tr>
+        </tbody></table></div>
+      </details>
+    </section>
+    <footer class="text-sm muted mt-6">Simulation data only. State stays in server memory; restarting the server resets the fleet. Export a snapshot when you need a record.</footer>
+  </main>
+</body>
+</html>

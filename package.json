@@ -1,0 +1,11 @@
+{
+  "name": "smartbin-digital-twin", "private": true, "type": "module",
+  "scripts": {
+    "dashboard": "node dashboard/server.mjs",
+    "simulator": "node simulator/server.mjs",
+    "configure:mqtt": "node mqtt/configure-ditto.mjs",
+    "verify:native": "node mqtt/verify-native.mjs",
+    "verify:operations": "node simulation/verify-operations.mjs",
+    "test": "node --test shared/*.test.mjs simulation/*.test.mjs mqtt/*.test.mjs dashboard/*.test.mjs simulator/*.test.mjs"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "smartbin-simulator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "verify:native": "node ../mqtt/verify-native.mjs",
+    "test": "node --test",
+    "build:css": "tailwindcss -i public/input.css -o public/styles.css --minify"
+  },
+  "dependencies": { "aedes": "0.51.3", "mqtt": "5.14.1" },
+  "devDependencies": { "@tailwindcss/cli": "4.1.18", "tailwindcss": "4.1.18", "daisyui": "5.5.14" }
+}

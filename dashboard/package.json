@@ -1,0 +1,8 @@
+{
+  "name": "smartbin-twin-dashboard", "private": true, "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test ../shared/*.test.mjs ../simulation/*.test.mjs ../mqtt/*.test.mjs *.test.mjs",
+    "build:css": "node ../simulator/node_modules/@tailwindcss/cli/dist/index.mjs -i ./public/input.css -o ./public/styles.css --minify"
+  }
+}
