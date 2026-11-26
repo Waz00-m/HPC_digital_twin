@@ -57,7 +57,8 @@ class PortableTests(unittest.TestCase):
             names[service] = "eclipse/" + (service if service == "ditto-ui" else "ditto-" + service) + ":latest"
         base = {"services": {name: {"image": image, "ports": ["0.0.0.0:27017:27017"], "networks": {"default": {}}} for name, image in names.items()}}
         hashes = {"node": "a" * 64, "python": "b" * 64}
-        result = compose.prepare(base, images, "/Users/boss/SmartBin Demo", hashes)
+        result = compose.prepare(base, images, "/Users/boss/SmartBin Demo", hashes, sample_seconds=10)
+        self.assertEqual(result["services"]["history"]["environment"]["TWIN_SAMPLE_SECONDS"], "10")
         self.assertEqual(result["name"], "smartbin-mac")
         self.assertNotIn("ports", result["services"]["mongodb"])
         self.assertNotIn("ports", result["services"]["gateway"])

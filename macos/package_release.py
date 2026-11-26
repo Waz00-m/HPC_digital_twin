@@ -11,14 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / ".runtime/releases/SmartBin-Mac-Demo.zip"
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 required = ["Install-Mac.command", "Start-Mac.command", "Stop-Mac.command", "Status-Mac.command",
-            "macos/setup.sh", "macos/images.lock.json", "history/twin_history/__main__.py", "docs/SmartBin-MacBook-Guide.pdf"]
+            "macos/setup.sh", "macos/images.lock.json", "history/twin_history/__main__.py", "docs/SmartBin-MacBook-Guide.pdf",
+            "docs/SmartBin-MacBook-Guide.docx", "history/fetch_smartbin_data.py", "history/twin_history/reader.py"]
 raw = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "-z"])
 paths = sorted(set(raw.decode("utf-8").split("\0")) - {""})
-manifest = {"prepared_date": "2026-11-25", "root_folder": "SmartBinDemo", "files": []}
+manifest = {"prepared_date": "2026-11-26", "root_folder": "SmartBinDemo", "files": []}
 
 
 def add(archive, relative, data):
-    entry = zipfile.ZipInfo("SmartBinDemo/" + relative, (2026, 11, 25, 12, 0, 0))
+    entry = zipfile.ZipInfo("SmartBinDemo/" + relative, (2026, 11, 26, 12, 0, 0))
     entry.create_system = 3
     executable = relative.endswith((".sh", ".command"))
     entry.external_attr = (stat.S_IFREG | (0o755 if executable else 0o644)) << 16

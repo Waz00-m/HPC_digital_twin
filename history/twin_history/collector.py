@@ -8,15 +8,19 @@ from .store import utc_now
 
 
 class Collector:
-    def __init__(self, store, client, reconcile_seconds=30):
+    def __init__(self, store, client, reconcile_seconds=30, sample_seconds=30):
         if not 1 <= reconcile_seconds <= 3600:
             raise ValueError("Reconciliation interval must be 1–3,600 seconds.")
         self.store, self.client = store, client
         store.bind_source(client.origin, client.namespace)
         self.reconcile_seconds = reconcile_seconds
+        if not isinstance(sample_seconds, int) or isinstance(sample_seconds, bool) or not 1 <= sample_seconds <= 3600:
+            raise ValueError("Sample interval must be 1–3,600 whole seconds.")
+        self.sample_seconds = sample_seconds
         self._lock = threading.Lock()
         self._state = {"connected": False, "last_event_at": None, "last_reconciled_at": None, "last_error": None,
-                       "capture": "Ditto SSE notifications plus observed complete Thing snapshots; reconnect has no event replay guarantee."}
+                       "sample_seconds": sample_seconds, "last_sampled_at": None, "last_sample_error": None,
+                       "capture": "Ditto SSE revisions plus independently timed HTTP samples, including unchanged values. reading_at remains the original reading time; gaps are not backfilled."}
 
     def status(self):
         with self._lock:
@@ -50,7 +54,38 @@ class Collector:
             self.store.insert_snapshot(thing)
         self._set(last_event_at=utc_now(), last_error=None)
 
+    def sample_once(self):
+        # Fetch from Ditto now; never relabel a locally cached value as a new GET.
+        result = self.store.record_samples(self.client.things())
+        self._set(last_sampled_at=result["sampled_at"], last_sample_error=None)
+        return result
+
+    def _sample_loop(self, stop):
+        while not stop.is_set():
+            started = time.monotonic()
+            try:
+                self.sample_once()
+            except Exception as error:
+                self._set(last_sample_error=str(error))
+                try:
+                    self.store.log("sample-gap", {"error": str(error), "sample_seconds": self.sample_seconds,
+                        "meaning": "No timed samples were fabricated for this failed Ditto GET. Stored revision history remains available."})
+                except Exception as log_error:
+                    self._set(last_sample_error=str(error) + "; could not save gap notice: " + str(log_error))
+            # Never overlap polls or fabricate missed intervals when a GET is slow.
+            stop.wait(max(0.1, self.sample_seconds - (time.monotonic() - started)))
+
     def run(self, stop):
+        sampling_stop = threading.Event()
+        sampling = threading.Thread(target=self._sample_loop, args=(sampling_stop,), daemon=True)
+        sampling.start()
+        try:
+            self._run_stream(stop)
+        finally:
+            sampling_stop.set()
+            sampling.join()
+
+    def _run_stream(self, stop):
         retry = 1
         while not stop.is_set():
             try:

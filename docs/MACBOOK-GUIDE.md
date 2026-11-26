@@ -1,6 +1,6 @@
 # SmartBin digital twin — MacBook setup and operation
 
-Prepared 25 November 2026. Use the supplied SmartBin-Mac-Demo.zip package with this guide.
+Updated 26 November 2026. Use the supplied SmartBin-Mac-Demo.zip package with this guide. The illustrated Word edition is [SmartBin-MacBook-Guide.docx](SmartBin-MacBook-Guide.docx); it includes browser screenshots and the timed-sample fetch pipeline.
 
 ## Before starting
 
@@ -83,6 +83,8 @@ One shared team is simulated while all bins continue changing. Fixed route, thre
 ## Stored Things and Python models
 
 The data path is spoofer > MQTT > Ditto Thing > history database > Python adapter > stored result. History reads post-Ditto change notifications and complete Thing snapshots, not the MQTT stream. It stores original JSON, warehouse/capacity context, revisions and timestamps. Connection gaps are recorded; offline periods cannot be assumed to contain complete history.
+
+The current history service also saves a timed observation every 30 seconds, even if a weight is unchanged. `sampled_at` is the observation time; `reading_at` retains the original load-reading receipt time. Failed polls are logged, never backfilled. Fetch stored model inputs with `bash macos/python.sh fetch --output /exports/all-bins.json`, or add `--format csv`. The read-only Python function, interval configuration and sample-based model-run options are documented in history/README.md.
 
 To run the existing pipeline check, open Terminal in SmartBinDemo:
 

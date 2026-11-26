@@ -6,7 +6,9 @@ from pathlib import Path
 from fingerprint import fingerprint
 
 
-def prepare(base, images, root, fingerprints=None):
+def prepare(base, images, root, fingerprints=None, sample_seconds=30):
+    if not isinstance(sample_seconds, int) or isinstance(sample_seconds, bool) or not 1 <= sample_seconds <= 3600:
+        raise ValueError("Sample interval must be 1–3,600 whole seconds.")
     root = str(root).rstrip("/\\")
     if not root or not isinstance(base.get("services"), dict):
         raise ValueError("Provide the repository root and normalized upstream Compose JSON.")
@@ -46,6 +48,7 @@ def prepare(base, images, root, fingerprints=None):
         if fingerprints:
             services[name]["build"]["labels"] = {"smartbin.source-fingerprint": fingerprints["python" if python else "node"]}
     services["history"]["environment"]["TWIN_HISTORY_DB"] = "/data/things.sqlite3"
+    services["history"]["environment"]["TWIN_SAMPLE_SECONDS"] = str(sample_seconds)
     services["history"]["volumes"] = [root + "/history/.data:/data", root + "/exports:/exports", root + "/history/models:/app/history/models:ro"]
     services["dashboard"]["volumes"] = [root + "/dashboard/.data:/app/dashboard/.data", root + "/.runtime/mac:/artifacts"]
     # Sharing nginx's network namespace makes Ditto a loopback HTTP peer. The
@@ -61,11 +64,12 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--images", type=Path, default=Path(__file__).with_name("images.lock.json"))
+    parser.add_argument("--sample-seconds", type=int, default=30)
     args = parser.parse_args()
     images = json.loads(args.images.read_text(encoding="utf-8"))["images"]
     source = Path(__file__).resolve().parents[1]
     hashes = {target: fingerprint(source, target, images) for target in ("node", "python", "provision")}
-    result = prepare(json.loads(args.base.read_text(encoding="utf-8")), images, args.root, hashes)
+    result = prepare(json.loads(args.base.read_text(encoding="utf-8")), images, args.root, hashes, args.sample_seconds)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     for target, value in hashes.items():
         args.output.with_name(target + "-fingerprint").write_text(value + "\n", encoding="ascii")

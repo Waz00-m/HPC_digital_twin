@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .store import FEATURE_COLUMNS, FEATURE_VERSION, canonical, timestamp, utc_now
+from .store import FEATURE_COLUMNS, FEATURE_VERSION, SAMPLE_COLUMNS, canonical, timestamp, utc_now
 
 
 @dataclass(frozen=True)
@@ -46,34 +46,42 @@ def load_adapter(path):
     if not callable(module.run) or not isinstance(module.MODEL_NAME, str) or not module.MODEL_NAME or not isinstance(module.MODEL_VERSION, str) or not module.MODEL_VERSION:
         raise ValueError("Adapter needs a callable run and nonempty model name/version.")
     required = tuple(getattr(module, "REQUIRED_COLUMNS", PIPELINE_CHECK.required_columns))
-    if not required or any(column not in FEATURE_COLUMNS for column in required):
+    if not required or any(column not in SAMPLE_COLUMNS for column in required):
         raise ValueError("Adapter requires unsupported input columns.")
     return Adapter(module.MODEL_NAME, module.MODEL_VERSION, module.run, required)
 
 
-def run_model(store, adapter=PIPELINE_CHECK, *, since=None, until=None, thing_id=None, warehouse_id=None, limit=10000):
+def run_model(store, adapter=PIPELINE_CHECK, *, since=None, until=None, thing_id=None, warehouse_id=None, limit=10000, input_series="revisions"):
+    if input_series not in ("samples", "revisions"):
+        raise ValueError("Model input series must be samples or revisions.")
     until = timestamp(until) if until else utc_now()
     since = timestamp(since) if since else (datetime.fromisoformat(until.replace("Z", "+00:00")) - timedelta(hours=24)).isoformat().replace("+00:00", "Z")
     # Preserve all selected rows in the manifest, including quality exclusions.
-    selected = store.history(since=since, until=until, thing_id=thing_id, warehouse_id=warehouse_id, limit=limit)
+    read = store.samples if input_series == "samples" else store.history
+    selected = read(since=since, until=until, thing_id=thing_id, warehouse_id=warehouse_id, limit=limit)
     rows = [row for row in selected if row["model_type"] == "SmartBin" and row["quality"] == "valid"]
     if not rows:
         raise ValueError("No valid SmartBin history is available for this model window. Collect Things with valid readings first.")
     if any(any(row.get(column) is None for column in adapter.required_columns) for row in rows):
         raise ValueError("Required model input is missing. Review the adapter's input contract.")
     run_id = str(uuid.uuid4())
-    included_ids = {row["snapshot_id"] for row in rows}
+    identity = "sample_id" if input_series == "samples" else "snapshot_id"
+    included_ids = {row[identity] for row in rows}
     with store.connection() as con:
         source = con.execute("SELECT value FROM metadata WHERE key='ditto_source'").fetchone()
-    manifest = {"input_schema_version": FEATURE_VERSION, "columns": list(FEATURE_COLUMNS),
+    manifest = {"input_schema_version": FEATURE_VERSION, "columns": list(SAMPLE_COLUMNS if input_series == "samples" else FEATURE_COLUMNS),
+                "input_series": input_series,
                 "query": {"since": since, "until": until, "thing_id": thing_id, "warehouse_id": warehouse_id, "limit": limit},
                 "snapshot_ids": [row["snapshot_id"] for row in rows],
-                "excluded_snapshot_ids": [row["snapshot_id"] for row in selected if row["snapshot_id"] not in included_ids],
+                "excluded_snapshot_ids": [row["snapshot_id"] for row in selected if row[identity] not in included_ids],
                 "input_sha256": hashlib.sha256(canonical(rows).encode()).hexdigest(),
                 "ditto_source": json.loads(source[0]) if source else None,
-                "sampling": "Observed Thing revisions, not regularly sampled or interpolated sensor data.",
+                "sampling": "Timed successful Ditto GETs, retaining unchanged values and original reading_at; no backfill." if input_series == "samples" else "Observed Thing revisions, not regularly sampled or interpolated sensor data.",
                 "capture_limits": "SSE outages and intermediate revisions may be absent as complete snapshots. Review collector_log and ditto_events.",
                 "recent_collector_notices": store.logs(10)}
+    if input_series == "samples":
+        manifest["sample_ids"] = [row["sample_id"] for row in rows]
+        manifest["excluded_sample_ids"] = [row["sample_id"] for row in selected if row["sample_id"] not in included_ids]
     with store.connection() as con:
         con.execute("INSERT INTO model_runs(run_id,model_name,model_version,started_at,status,manifest_json) VALUES (?,?,?,?,?,?)",
                     (run_id, adapter.name, adapter.version, utc_now(), "running", canonical(manifest)))
@@ -110,13 +118,17 @@ def list_runs(store, limit=50):
 
 def run_inputs(store, run_id):
     manifest = get_run(store, run_id)["manifest"]
-    ids = manifest["snapshot_ids"]
+    sampled = manifest.get("input_series") == "samples"
+    ids = manifest["sample_ids"] if sampled else manifest["snapshot_ids"]
     found = {}
     with store.connection() as con:
         for start in range(0, len(ids), 500):
             chunk = ids[start:start + 500]
-            for row in con.execute("SELECT " + ",".join(FEATURE_COLUMNS) + " FROM snapshots WHERE snapshot_id IN (" + ",".join("?" for _ in chunk) + ")", chunk):
-                found[row["snapshot_id"]] = dict(row)
+            columns = ("p.sample_id,p.sampled_at," if sampled else "") + ",".join("s." + c for c in FEATURE_COLUMNS)
+            table = "samples p JOIN snapshots s ON s.snapshot_id=p.snapshot_id" if sampled else "snapshots s"
+            key = "p.sample_id" if sampled else "s.snapshot_id"
+            for row in con.execute("SELECT " + columns + " FROM " + table + " WHERE " + key + " IN (" + ",".join("?" for _ in chunk) + ")", chunk):
+                found[row["sample_id" if sampled else "snapshot_id"]] = dict(row)
     if len(found) != len(ids):
         raise ValueError("Stored model input snapshots are missing.")
     rows = [found[identity] for identity in ids]

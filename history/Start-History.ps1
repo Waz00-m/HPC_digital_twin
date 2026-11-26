@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [string]$PythonPath,
-    [ValidateRange(1024, 65535)][int]$Port = 4322
+    [ValidateRange(1024, 65535)][int]$Port = 4322,
+    [ValidateRange(1, 3600)][int]$SampleSeconds = 30
 )
 $ErrorActionPreference = 'Stop'
 $historyRoot = $PSScriptRoot
@@ -31,7 +32,7 @@ if ($listener) {
     Write-Host "Thing history is already running: http://127.0.0.1:$Port/api/metrics"
     return
 }
-$process = Start-Process -FilePath $python -ArgumentList @('-m', 'twin_history', 'serve', '--port', "$Port") -WorkingDirectory $historyRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'history.out.log') -RedirectStandardError (Join-Path $runtime 'history.err.log')
+$process = Start-Process -FilePath $python -ArgumentList @('-m', 'twin_history', 'serve', '--port', "$Port", '--sample-seconds', "$SampleSeconds") -WorkingDirectory $historyRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'history.out.log') -RedirectStandardError (Join-Path $runtime 'history.err.log')
 Set-Content -LiteralPath (Join-Path $runtime 'history.pid') -Value $process.Id
 $ready = $false
 for ($attempt = 0; $attempt -lt 20; $attempt++) {

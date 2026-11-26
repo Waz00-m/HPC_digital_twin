@@ -4,7 +4,7 @@ Three warehouses, nine virtual bins. The original V1 SmartBin application remain
 
 ## MacBook setup from a clean machine
 
-Use the supplied SmartBin-Mac-Demo.zip and [MacBook guide](docs/MACBOOK-GUIDE.md). Extract the SmartBinDemo folder into your Home folder, open Terminal, and run:
+Use the supplied SmartBin-Mac-Demo.zip and [illustrated Word guide](docs/SmartBin-MacBook-Guide.docx), or the [copyable MacBook instructions](docs/MACBOOK-GUIDE.md). Extract the SmartBinDemo folder into your Home folder, open Terminal, and run:
 
 ~~~bash
 cd "$HOME/SmartBinDemo"
@@ -14,6 +14,8 @@ bash macos/setup.sh
 The Mac edition is Docker-only: it installs Docker Desktop when needed and runs all Node/Python dependencies in native Apple Silicon/Intel containers. Complete Docker's first-run terms and macOS prompts when shown. No separate Git, Homebrew, Node, Python or PowerShell installation is required. Later use Start-Mac.command, Stop-Mac.command and Status-Mac.command. The isolated smartbin-mac stack preserves MongoDB, MQTT, history and drafts and exposes only loopback ports. The Windows setup below remains available separately.
 
 Repeating setup reuses existing Docker, cached images and unchanged app builds. It opens an installed but stopped Docker Desktop and skips healthy, unchanged OWL/MQTT provisioning. Apple Silicon/Intel and normal or registered custom Docker app locations are detected automatically. Incomplete installations produce a repair message; remote Docker contexts and stacks belonging to another source folder are left in place.
+
+The history backend records timed Ditto observations every 30 seconds, including unchanged weights, while retaining the original sensor receipt time and immutable revision history. Use `npm run fetch:data` (Windows) or `bash macos/python.sh fetch` (Mac Docker edition) to retrieve model inputs in read-only mode. See [Python retrieval and timed samples](history/README.md#fetch-data-for-the-models) for exports, interval configuration and the supplied-model integration point.
 
 ## Clone and set up a new computer
 

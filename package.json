@@ -7,6 +7,7 @@
     "verify:native": "node mqtt/verify-native.mjs",
     "verify:operations": "node simulation/verify-operations.mjs",
     "history": "node history/run-python.mjs -m twin_history",
+    "fetch:data": "node history/run-python.mjs fetch_smartbin_data.py",
     "test:history": "node history/run-python.mjs -m unittest discover -s tests -v",
     "verify:history": "node history/run-python.mjs verify_live.py",
     "test:mac": "node history/run-python.mjs -m unittest discover -s ../macos -p test_*.py -v",

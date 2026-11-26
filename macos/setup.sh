@@ -7,6 +7,8 @@ fi
 source "$(cd "$(dirname "$0")" && pwd -P)/common.sh"
 require_mac
 mkdir -p "$RUNTIME" "$ROOT/history/.data" "$ROOT/dashboard/.data" "$ROOT/exports"
+sample_seconds="${TWIN_SAMPLE_SECONDS:-$(cat "$RUNTIME/sample-seconds" 2>/dev/null || printf 30)}"
+[[ "$sample_seconds" =~ ^[0-9]+$ ]] && [ "$sample_seconds" -ge 1 ] && [ "$sample_seconds" -le 3600 ] || die 'TWIN_SAMPLE_SECONDS must be 1–3,600 whole seconds.'
 trap 'code=$?; printf "\nSetup stopped. Fix the message above and rerun Install-Mac.command; committed data is preserved.\n" >&2; exit "$code"' ERR
 say 'Checking this Mac'
 printf 'macOS %s; %s\n' "$(sw_vers -productVersion)" "$(uname -m)"
@@ -68,8 +70,9 @@ case "$python_image" in python:3.12-slim-bookworm@sha256:*) ;; *) die 'Invalid p
 ensure_image "$python_image"
 docker_cli run --rm --network none --user "$(id -u):$(id -g)" -e PYTHONDONTWRITEBYTECODE=1 \
   -v "$ROOT:/workspace" "$python_image" python /workspace/macos/prepare_stack.py \
-  --base /workspace/.runtime/mac/base-compose.json --root "$ROOT" --output /workspace/.runtime/mac/compose.json
+  --base /workspace/.runtime/mac/base-compose.json --root "$ROOT" --output /workspace/.runtime/mac/compose.json --sample-seconds "$sample_seconds"
 dc config --quiet
+printf '%s\n' "$sample_seconds" > "$RUNTIME/sample-seconds"
 say 'Checking cached images and app runtimes'
 while IFS= read -r required_image; do
   [ -n "$required_image" ] && ensure_image "$required_image"

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 if [ "${1:-}" = --help ] || [ "$#" -eq 0 ]; then
-  printf 'Usage: bash macos/python.sh run-model|latest|export|metrics|benchmark [options]\nRuns the existing Python pipeline inside the installed history container.\n'
+  printf 'Usage: bash macos/python.sh fetch|run-model|latest|export|metrics|benchmark [options]\nRuns the Python data pipeline inside the installed history container.\n'
   exit 0
 fi
 source "$(cd "$(dirname "$0")" && pwd -P)/common.sh"

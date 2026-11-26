@@ -13,6 +13,7 @@ from .benchmark import benchmark
 from .collector import Collector
 from .ditto import DittoClient
 from .models import PIPELINE_CHECK, get_run, load_adapter, run_inputs, run_model
+from .reader import add_arguments as fetch_arguments, fetch_command
 from .server import make_server
 from .store import Store, FEATURE_COLUMNS
 
@@ -26,10 +27,13 @@ def main():
     commands.add_parser("init")
     collect = commands.add_parser("collect")
     collect.add_argument("--once", action="store_true")
+    collect.add_argument("--sample-seconds", type=int, default=os.getenv("TWIN_SAMPLE_SECONDS", "30"))
     serve = commands.add_parser("serve")
     serve.add_argument("--port", type=int, default=4322)
     serve.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")
     serve.add_argument("--no-collect", action="store_true", help="Serve stored data without contacting Ditto")
+    serve.add_argument("--sample-seconds", type=int, default=os.getenv("TWIN_SAMPLE_SECONDS", "30"))
+    fetch_arguments(commands.add_parser("fetch", help="Read-only model data retrieval, including repeated timed samples"))
     latest = commands.add_parser("latest")
     latest.add_argument("--thing-id")
     latest.add_argument("--warehouse-id")
@@ -43,12 +47,16 @@ def main():
             command.add_argument("--format", choices=("json", "csv"), default="json")
         else:
             command.add_argument("--adapter", type=Path, help="Supplied local Python adapter; omitted = pipeline-check only")
+            command.add_argument("--input-series", choices=("samples", "revisions"), default="revisions")
     commands.add_parser("metrics")
     run = commands.add_parser("get-run"); run.add_argument("run_id"); run.add_argument("--include-inputs", action="store_true")
     bench = commands.add_parser("benchmark")
     bench.add_argument("--bins", type=int, default=100); bench.add_argument("--revisions", type=int, default=1000)
     bench.add_argument("--queries", type=int, default=30); bench.add_argument("--directory", type=Path, default=ROOT / ".results")
     args = parser.parse_args()
+    if args.command == "fetch":
+        fetch_command(args)
+        return
     if args.command == "benchmark":
         result = benchmark(args.directory, args.bins, args.revisions, args.queries)
     else:
@@ -66,7 +74,7 @@ def main():
         elif args.command in ("export", "run-model"):
             query = {key: getattr(args, key) for key in ("thing_id", "warehouse_id", "since", "until", "limit")}
             if args.command == "run-model":
-                result = run_model(store, load_adapter(args.adapter) if args.adapter else PIPELINE_CHECK, **query)
+                result = run_model(store, load_adapter(args.adapter) if args.adapter else PIPELINE_CHECK, input_series=args.input_series, **query)
             else:
                 rows = store.history(**query)
                 args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -84,10 +92,10 @@ def main():
             signal.signal(signal.SIGINT, stop_signal)
             if hasattr(signal, "SIGTERM"):
                 signal.signal(signal.SIGTERM, stop_signal)
-            collector = None if getattr(args, "no_collect", False) else Collector(store, DittoClient())
+            collector = None if getattr(args, "no_collect", False) else Collector(store, DittoClient(), sample_seconds=args.sample_seconds)
             if args.command == "collect":
                 if args.once:
-                    result = collector.reconcile()
+                    result = collector.sample_once()
                 else:
                     try:
                         collector.run(stop)

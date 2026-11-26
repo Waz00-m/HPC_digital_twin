@@ -13,13 +13,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FEATURE_VERSION = 1
 FEATURE_COLUMNS = (
     "snapshot_id", "thing_id", "revision", "observed_at", "ditto_modified_at", "model_type",
     "bin_id", "warehouse_id", "reading_at", "weight_kg", "capacity_kg", "weight_percent",
     "alert_threshold_percent", "alert_active", "status", "source", "quality", "feature_version",
 )
+SAMPLE_COLUMNS = ("sample_id", "sampled_at") + FEATURE_COLUMNS
 
 
 def utc_now():
@@ -86,18 +87,34 @@ def features(thing, observed_at):
 
 
 class Store:
-    def __init__(self, path):
+    def __init__(self, path, *, readonly=False):
         self.path = Path(path).resolve()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.readonly = readonly
+        if readonly:
+            if not self.path.is_file():
+                raise ValueError("History database does not exist. Start the history collector first: " + str(self.path))
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
         self._times = defaultdict(lambda: deque(maxlen=512))
         self._lock = threading.Lock()
         self._read_pool = queue.LifoQueue(maxsize=4)
         self._pool_lock = threading.Lock()
         self._pool_count = 0
         self._closed = False
+        if readonly:
+            try:
+                with self.read_connection() as con:
+                    version = con.execute("PRAGMA user_version").fetchone()[0]
+                    if version != SCHEMA_VERSION:
+                        raise ValueError("Start/restart the history service to prepare database schema " + str(SCHEMA_VERSION) + "; the read-only fetcher did not change it.")
+                    self.journal_mode = con.execute("PRAGMA journal_mode").fetchone()[0]
+            except Exception:
+                self.close()
+                raise
+            return
         with self.connection() as con:
             version = con.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, SCHEMA_VERSION):
+            if version not in (0, 1, SCHEMA_VERSION):
                 raise ValueError("Unsupported history schema version: " + str(version))
             requested_mode = "WAL" if supports_safe_wal(sqlite3.sqlite_version_info) else "DELETE"
             self.journal_mode = con.execute("PRAGMA journal_mode=" + requested_mode).fetchone()[0]
@@ -131,11 +148,21 @@ class Store:
                     started_at TEXT NOT NULL, finished_at TEXT, status TEXT NOT NULL,
                     manifest_json TEXT NOT NULL, output_json TEXT, error TEXT
                 );
-                PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS samples (
+                    sample_id INTEGER PRIMARY KEY,
+                    sampled_at TEXT NOT NULL,
+                    snapshot_id INTEGER NOT NULL REFERENCES snapshots(snapshot_id),
+                    UNIQUE(snapshot_id, sampled_at)
+                );
+                CREATE INDEX IF NOT EXISTS samples_by_time ON samples(sampled_at, sample_id);
+                CREATE INDEX IF NOT EXISTS samples_by_snapshot_time ON samples(snapshot_id, sampled_at, sample_id);
+                PRAGMA user_version=2;
             """)
 
     @contextmanager
     def connection(self):
+        if self.readonly:
+            raise ValueError("This database connection is read-only.")
         con = sqlite3.connect(self.path, timeout=15)
         con.row_factory = sqlite3.Row
         con.execute("PRAGMA foreign_keys=ON")
@@ -159,7 +186,7 @@ class Store:
                     self._pool_count += 1
             if create:
                 try:
-                    con = sqlite3.connect(self.path, timeout=15, check_same_thread=False)
+                    con = sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=15, check_same_thread=False)
                     con.row_factory = sqlite3.Row
                     con.execute("PRAGMA query_only=ON")
                 except Exception:
@@ -203,6 +230,8 @@ class Store:
         columns = [column for column in FEATURE_COLUMNS if column != "snapshot_id"] + ["content_hash", "thing_json"]
         values = [row[column] for column in columns[:-2]] + [digest, payload]
         with self.connection() as con:
+            # SSE and the timer can observe the same revision concurrently.
+            con.execute("BEGIN IMMEDIATE")
             existing = con.execute("SELECT snapshot_id, content_hash FROM snapshots WHERE thing_id=? AND revision=?", (thing_id, revision)).fetchone()
             if existing:
                 if existing["content_hash"] != digest:
@@ -229,6 +258,46 @@ class Store:
             cur = con.execute("INSERT OR IGNORE INTO ditto_events(event_key,thing_id,observed_at,event_json) VALUES (?,?,?,?)",
                               (key, thing_id, observed_at or utc_now(), payload))
         return cur.rowcount == 1
+
+    def record_samples(self, things, sampled_at=None):
+        """Record a successful fresh GET, including unchanged Thing revisions."""
+        sampled_at = timestamp(sampled_at) if sampled_at else utc_now()
+        snapshots = [self.insert_snapshot(thing, sampled_at) for thing in things]
+        ids = []
+        with self.connection() as con:
+            for snapshot in snapshots:
+                con.execute("INSERT OR IGNORE INTO samples(sampled_at,snapshot_id) VALUES (?,?)", (sampled_at, snapshot["snapshot_id"]))
+                ids.append(con.execute("SELECT sample_id FROM samples WHERE sampled_at=? AND snapshot_id=?", (sampled_at, snapshot["snapshot_id"])).fetchone()[0])
+        return {"read": len(things), "inserted": sum(item["inserted"] for item in snapshots),
+                "sampled_at": sampled_at, "sample_ids": ids, "samples": len(ids)}
+
+    def samples(self, *, thing_id=None, warehouse_id=None, since=None, until=None, limit=10000, valid_only=False, include_thing=False, bins_only=False):
+        started = time.perf_counter()
+        self._filters(thing_id, warehouse_id)
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 50000:
+            raise ValueError("Sample limit must be 1–50,000 rows.")
+        if since and until and timestamp(since) > timestamp(until):
+            raise ValueError("The sample start must not be after its end.")
+        clauses, args = [], []
+        for column, op, value in (("s.thing_id", "=", thing_id), ("s.warehouse_id", "=", warehouse_id),
+                ("p.sampled_at", ">=", timestamp(since) if since else None), ("p.sampled_at", "<=", timestamp(until) if until else None)):
+            if value is not None:
+                clauses.append(column + op + "?"); args.append(value)
+        if valid_only:
+            clauses += ["s.quality='valid'", "s.model_type='SmartBin'"]
+        elif bins_only:
+            clauses += ["s.model_type='SmartBin'"]
+        columns = "p.sample_id,p.sampled_at," + ("s.*" if include_thing else ",".join("s." + c for c in FEATURE_COLUMNS))
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self.read_connection() as con:
+            rows = [dict(row) for row in con.execute("SELECT " + columns + " FROM samples p JOIN snapshots s ON s.snapshot_id=p.snapshot_id" + where + " ORDER BY p.sampled_at,p.sample_id LIMIT ?", args + [limit + 1])]
+        if len(rows) > limit:
+            raise ValueError("The query exceeds its row limit. Narrow the time range or Thing/warehouse filter; data was not silently truncated.")
+        if include_thing:
+            for row in rows:
+                row["thing"] = json.loads(row.pop("thing_json"))
+        self._measure("samples", started, len(rows))
+        return rows
 
     def mark_deleted(self, thing_id, revision=None):
         with self.connection() as con:
@@ -263,7 +332,7 @@ class Store:
         self._measure("latest", started, len(rows))
         return rows
 
-    def history(self, *, thing_id=None, warehouse_id=None, since=None, until=None, limit=10000, valid_only=False, include_thing=False):
+    def history(self, *, thing_id=None, warehouse_id=None, since=None, until=None, limit=10000, valid_only=False, include_thing=False, bins_only=False):
         started = time.perf_counter()
         self._filters(thing_id, warehouse_id)
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 50000:
@@ -277,6 +346,8 @@ class Store:
             raise ValueError("The history start must not be after its end.")
         if valid_only:
             clauses += ["quality='valid'", "model_type='SmartBin'"]
+        elif bins_only:
+            clauses += ["model_type='SmartBin'"]
         columns = "*" if include_thing else ",".join(FEATURE_COLUMNS)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         with self.read_connection() as con:
@@ -301,7 +372,7 @@ class Store:
 
     def metrics(self):
         with self.read_connection() as con:
-            counts = {table: con.execute("SELECT count(*) FROM " + table).fetchone()[0] for table in ("snapshots", "latest_things", "ditto_events", "model_runs")}
+            counts = {table: con.execute("SELECT count(*) FROM " + table).fetchone()[0] for table in ("snapshots", "samples", "latest_things", "ditto_events", "model_runs")}
         with self._lock:
             queries = {name: {"samples": len(samples), "last_rows": samples[-1]["rows"], "last_ms": samples[-1]["ms"],
                 "p50_ms": statistics.median(s["ms"] for s in samples),

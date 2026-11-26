@@ -13,7 +13,7 @@ def fingerprint(root, target, images):
         extensions = {".js", ".mjs", ".json", ".css", ".html"}
         bases = ("node:24-bookworm-slim",)
     elif target == "python":
-        paths = [root / "history/twin_history", root / "history/pyproject.toml", root / "ontology", root / "macos/Dockerfile"]
+        paths = [root / "history/twin_history", root / "history/fetch_smartbin_data.py", root / "history/pyproject.toml", root / "ontology", root / "macos/Dockerfile"]
         extensions = {".py", ".toml", ".owl"}
         bases = ("python:3.12-slim-bookworm",)
     elif target == "provision":

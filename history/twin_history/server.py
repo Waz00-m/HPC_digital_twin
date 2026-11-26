@@ -40,8 +40,8 @@ def make_server(store, collector=None, port=4322, host="127.0.0.1"):
                 if url.path == "/health":
                     return self.reply(200, {"status": "UP", "service": "smartbin-thing-history", "collector": collector.status() if collector else None,
                         "boss_model_connected": False, "registered_model": "pipeline-check"})
-                if url.path in ("/api/latest", "/api/history"):
-                    allowed = {"thing_id", "warehouse_id", "include_thing"} | ({"since", "until", "limit", "valid_only"} if url.path == "/api/history" else set())
+                if url.path in ("/api/latest", "/api/history", "/api/samples"):
+                    allowed = {"thing_id", "warehouse_id", "include_thing"} | ({"since", "until", "limit", "valid_only"} if url.path != "/api/latest" else set())
                     if set(values) - allowed:
                         raise ValueError("Unknown query parameters: " + ", ".join(sorted(set(values) - allowed)))
                     for flag in ("include_thing", "valid_only"):
@@ -51,7 +51,8 @@ def make_server(store, collector=None, port=4322, host="127.0.0.1"):
                             values[flag] = values[flag] == "true"
                     if "limit" in values:
                         values["limit"] = int(values["limit"])
-                    rows = store.history(**values) if url.path == "/api/history" else store.latest(**values)
+                    read = {"/api/latest": store.latest, "/api/history": store.history, "/api/samples": store.samples}[url.path]
+                    rows = read(**values)
                     return self.reply(200, {"rows": rows, "count": len(rows), "source": "stored Ditto Thing snapshots"})
                 if url.path == "/api/metrics":
                     return self.reply(200, {**store.metrics(), "collector": collector.status() if collector else None})
@@ -80,7 +81,7 @@ def make_server(store, collector=None, port=4322, host="127.0.0.1"):
                 if not 0 < length <= 16000:
                     raise ValueError("Provide a JSON request of at most 16 KB.")
                 value = json.loads(self.rfile.read(length))
-                if not isinstance(value, dict) or set(value) - {"model", "since", "until", "thing_id", "warehouse_id", "limit"}:
+                if not isinstance(value, dict) or set(value) - {"model", "since", "until", "thing_id", "warehouse_id", "limit", "input_series"}:
                     raise ValueError("Provide only model, time range, Thing/warehouse filter and limit.")
                 if value.pop("model", "pipeline-check") != "pipeline-check":
                     raise ValueError("Only pipeline-check is registered. Integrate the supplied model through the Python adapter first.")
