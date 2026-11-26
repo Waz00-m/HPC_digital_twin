@@ -47,7 +47,9 @@ export async function createDashboard({ port = 4321, client = createDittoClient(
       return json(res, 404, { error: 'Not found.' });
     } catch (error) { json(res, url.pathname === '/api/fleet' ? 503 : 400, { error: error.message }); }
   });
-  server.listen(port, '127.0.0.1'); await once(server, 'listening');
+  const bindHost = process.env.SMARTBIN_BIND_HOST || '127.0.0.1';
+  if (!['127.0.0.1', '0.0.0.0'].includes(bindHost)) throw new Error('Use loopback or the explicit container bind host.');
+  server.listen(port, bindHost); await once(server, 'listening');
   return { url: 'http://127.0.0.1:' + server.address().port, close: () => new Promise(resolveClose => server.close(resolveClose)) };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

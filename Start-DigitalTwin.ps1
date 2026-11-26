@@ -1,4 +1,6 @@
 #Requires -Version 5.1
+[CmdletBinding()]
+param([switch]$WithHistory)
 $ErrorActionPreference = 'Stop'
 $twinRoot = $PSScriptRoot
 $runtimePath = Join-Path $twinRoot '.runtime'
@@ -30,3 +32,4 @@ Write-Host 'Dashboard: http://127.0.0.1:4321/'
 Write-Host 'Simulator: http://127.0.0.1:4318/'
 Write-Host 'Ditto:     http://localhost:8090/ui/'
 Write-Host 'Native MQTT is configured. Connect the simulator broker and press Send reading to change a bin.'
+if ($WithHistory) { & (Join-Path $twinRoot 'history/Start-History.ps1') }

@@ -1,5 +1,13 @@
 # Installed dependencies and local runtime state
 **/node_modules/
+**/.venv/
+history/.cache/
+**/__pycache__/
+*.py[cod]
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.egg-info/
 .runtime/
 **/.data/
 **/.results/
@@ -20,3 +28,4 @@ Thumbs.db
 mqtt/native-connection.json
 mqtt/native-demo-results.json
 simulator/demo-results.json
+exports/

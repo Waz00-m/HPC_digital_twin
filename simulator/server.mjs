@@ -147,7 +147,9 @@ export async function createApplication({ port = 4318, mqttPort = null, brokerUr
       json(res, 404, { error: 'Not found.' });
     } catch (error) { json(res, 400, { error: error.message }); }
   });
-  server.listen(port, '127.0.0.1');
+  const bindHost = process.env.SMARTBIN_BIND_HOST || '127.0.0.1';
+  if (!['127.0.0.1', '0.0.0.0'].includes(bindHost)) throw new Error('Use loopback or the explicit container bind host.');
+  server.listen(port, bindHost);
   try { await once(server, 'listening'); } catch (error) { clearInterval(timer); brokerServer?.close(); broker?.close(); throw error; }
   return { url: `http://127.0.0.1:${server.address().port}`, localBrokerUrl, snapshot, action,
     async close() { clearInterval(timer); streams.forEach(s => s.end()); await disconnect(); await new Promise(r => server.close(r)); if (broker) await new Promise(r => broker.close(r)); if (brokerServer) await new Promise(r => brokerServer.close(r)); } };

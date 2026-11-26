@@ -2,6 +2,19 @@
 
 Three warehouses, nine virtual bins. The original V1 SmartBin application remains separate.
 
+## MacBook setup from a clean machine
+
+Use the supplied SmartBin-Mac-Demo.zip and [MacBook guide](docs/MACBOOK-GUIDE.md). Extract the SmartBinDemo folder into your Home folder, open Terminal, and run:
+
+~~~bash
+cd "$HOME/SmartBinDemo"
+bash macos/setup.sh
+~~~
+
+The Mac edition is Docker-only: it installs Docker Desktop when needed and runs all Node/Python dependencies in native Apple Silicon/Intel containers. Complete Docker's first-run terms and macOS prompts when shown. No separate Git, Homebrew, Node, Python or PowerShell installation is required. Later use Start-Mac.command, Stop-Mac.command and Status-Mac.command. The isolated smartbin-mac stack preserves MongoDB, MQTT, history and drafts and exposes only loopback ports. The Windows setup below remains available separately.
+
+Repeating setup reuses existing Docker, cached images and unchanged app builds. It opens an installed but stopped Docker Desktop and skips healthy, unchanged OWL/MQTT provisioning. Apple Silicon/Intel and normal or registered custom Docker app locations are detected automatically. Incomplete installations produce a repair message; remote Docker contexts and stacks belonging to another source folder are left in place.
+
 ## Clone and set up a new computer
 
 This repository contains the digital twin demo only. Eclipse Ditto is a submodule pinned to the version used by the demo. Install Git, Node.js 20 or newer and Docker Desktop with Linux containers. Start Docker Desktop before the Docker commands.
@@ -82,12 +95,31 @@ Bin purposes & demand configures Collection or Inventory per bin, assumed demand
 
 These are read-only scenario runs. Capacities/starting readings come from Ditto; purposes, demand, travel and service are demo assumptions. Comparisons publish no MQTT, change no live twins and operate no physical devices. The least-time-remaining rule is a heuristic; OWL reasoning, learned demand and physical calibration are not implemented. See simulation/README.md for model rules and limits.
 
+## Store Thing history and prepare Python model inputs
+
+The next-stage data path is Ditto Thing -> indexed database -> Python model adapter -> stored result. The history service reads Ditto's Thing change notifications and complete snapshots; it never subscribes to raw MQTT. It preserves original Thing JSON, historical model attributes and readings, revision/timestamps, and data-quality flags.
+
+From the repository root, with Python 3.11+ or uv available:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\history\Start-History.ps1
+# On later restarts you can start everything together:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Start-DigitalTwin.ps1 -WithHistory
+npm.cmd run history -- run-model
+~~~
+
+The database is history/.data/things.sqlite3. View stored latest Things at http://127.0.0.1:4322/api/latest?include_thing=true and retrieval timings at http://127.0.0.1:4322/api/metrics. SQLite is indexed for current-state, Thing/time and warehouse/time retrieval; a reproducible 100-bin/100,000-version benchmark reports measured timings instead of claiming a universally fastest database.
+
+The working pipeline-check adapter proves DB-to-Python retrieval with prediction=false. The boss's actual model is not supplied; history/models/boss_adapter.py is its pending integration point. Input schema, exact snapshot references, input hashes and versioned model-run results are ready. Collection gaps are explicit, and simulations/model outputs never modify live Things. See [history/README.md](history/README.md) for setup, API, export, model contract and benchmarks. History state and Python environments are ignored by Git.
+
 ## Verification
 
 ~~~powershell
 npm.cmd test
 npm.cmd run verify:native
 npm.cmd run verify:operations
+npm.cmd run test:history
+npm.cmd run verify:history
 ~~~
 
 Native verification deliberately changes all nine virtual bin weights, verifies actual Ditto revisions/source/identity, checks invalid payload rejection, and leaves three normal, three attention and three overloaded bins. It requires the removed bridge's port 4320 to be closed. Report: mqtt/native-demo-results.json. Ordinary tests use isolated fixtures and prove previews do not change twin inputs.

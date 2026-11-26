@@ -6,6 +6,10 @@
     "configure:mqtt": "node mqtt/configure-ditto.mjs",
     "verify:native": "node mqtt/verify-native.mjs",
     "verify:operations": "node simulation/verify-operations.mjs",
+    "history": "node history/run-python.mjs -m twin_history",
+    "test:history": "node history/run-python.mjs -m unittest discover -s tests -v",
+    "verify:history": "node history/run-python.mjs verify_live.py",
+    "test:mac": "node history/run-python.mjs -m unittest discover -s ../macos -p test_*.py -v",
     "test": "node --test shared/*.test.mjs simulation/*.test.mjs mqtt/*.test.mjs dashboard/*.test.mjs simulator/*.test.mjs"
   }
 }
