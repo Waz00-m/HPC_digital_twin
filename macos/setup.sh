@@ -93,9 +93,9 @@ else
   dc run --rm --no-deps -T dashboard node macos/check.mjs --configure
 fi
 say 'Starting the spoofer, warehouse dashboard and Python Thing-history service'
-dc up -d --no-build --pull never dashboard simulator history
+start_apps
 say 'Seeding only missing readings and checking the complete Thing-to-Python pipeline'
-dc exec -T dashboard node macos/check.mjs --seed-missing --report
+check_pipeline --seed-missing --report
 printf '%s\n' "$provision" > "$RUNTIME/provision-complete"
 printf '\nSetup complete. Future use: Start-Mac.command. Stop-Mac.command preserves your databases.\n'
 open_tools

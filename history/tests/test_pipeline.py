@@ -11,7 +11,7 @@ from twin_history.collector import Collector
 from twin_history.ditto import DittoClient, sse_messages
 from twin_history.models import Adapter, get_run, list_runs, run_inputs, run_model
 from twin_history.server import make_server
-from twin_history.store import Store, timestamp, supports_safe_wal
+from twin_history.store import Store, timestamp, supports_safe_wal, same_json_value
 
 
 def thing(revision=1, weight=20, capacity=50, **changes):
@@ -58,6 +58,21 @@ class PipelineTest(unittest.TestCase):
         self.store.mark_deleted("smartbin:bin-002")
         self.assertEqual(self.store.latest(), [])
         self.assertEqual(len(self.store.history()), 3)
+
+    def test_equivalent_json_numbers_do_not_conflict_or_rewrite_saved_inputs(self):
+        original = thing(weight=20, capacity=50)
+        first = self.store.insert_snapshot(original)
+        variant = thing(weight=20.0, capacity=50.0)
+        variant["attributes"]["alertThresholdPercent"] = 85.0
+        again = self.store.insert_snapshot(variant)
+        self.assertFalse(again["inserted"])
+        self.assertEqual(first["snapshot_id"], again["snapshot_id"])
+        self.assertEqual(self.store.latest(include_thing=True)[0]["thing"], original)
+        with self.assertRaisesRegex(ValueError, 'smartbin:bin-002.*revision 1.*features'):
+            self.store.insert_snapshot(thing(weight=21))
+        self.assertFalse(same_json_value({"weight": True}, {"weight": 1}))
+        self.assertFalse(same_json_value({"weight": None}, {}))
+        self.assertFalse(same_json_value(9007199254740993, 9007199254740992.0))
 
     def test_quality_gates_and_sql_filters(self):
         invalid = thing(2)

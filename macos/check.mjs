@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { createDittoClient } from '../shared/ditto-client.mjs';
 import { normalizeFleet } from '../shared/fleet.mjs';
+import { assertHistoryReady } from './history-readiness.mjs';
 const client = createDittoClient();
 const seedMissing = process.argv.includes('--seed-missing');
 const report = process.argv.includes('--report');
@@ -71,7 +72,7 @@ if (seedMissing) {
 }
 const stored = await retry(async () => {
   const health = await api(history, '/health');
-  if (!health.collector?.connected) throw new Error('History collector has not connected to Ditto.');
+  assertHistoryReady(health);
   const latest = await api(history, '/api/latest');
   const valid = latest.rows.filter(row => row.model_type === 'SmartBin' && row.quality === 'valid');
   if (valid.length !== 9) throw new Error('Waiting for nine valid bin snapshots. On first setup run Install-Mac.command; otherwise send the missing readings.');

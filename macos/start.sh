@@ -9,6 +9,6 @@ resources
 say 'Starting the installed demo; database volumes and existing readings are preserved'
 dc up -d --no-build --pull never mongodb policies things things-search connectivity gateway ditto-ui swagger-ui nginx mqtt
 wait_ditto
-dc up -d --no-build --pull never dashboard simulator history
-dc exec -T dashboard node macos/check.mjs
+start_apps
+check_pipeline
 open_tools

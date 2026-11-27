@@ -11,6 +11,6 @@
     "test:history": "node history/run-python.mjs -m unittest discover -s tests -v",
     "verify:history": "node history/run-python.mjs verify_live.py",
     "test:mac": "node history/run-python.mjs -m unittest discover -s ../macos -p test_*.py -v",
-    "test": "node --test shared/*.test.mjs simulation/*.test.mjs mqtt/*.test.mjs dashboard/*.test.mjs simulator/*.test.mjs"
+    "test": "node --test shared/*.test.mjs simulation/*.test.mjs mqtt/*.test.mjs dashboard/*.test.mjs simulator/*.test.mjs macos/*.test.mjs"
   }
 }

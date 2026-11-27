@@ -9,7 +9,7 @@ def fingerprint(root, target, images):
     root = Path(root)
     if target == "node":
         paths = [root / folder for folder in ("simulator", "dashboard", "shared", "simulation", "mqtt")]
-        paths += [root / "macos/check.mjs", root / "macos/Dockerfile", root / "package.json"]
+        paths += [root / "macos/check.mjs", root / "macos/history-readiness.mjs", root / "macos/Dockerfile", root / "package.json"]
         extensions = {".js", ".mjs", ".json", ".css", ".html"}
         bases = ("node:24-bookworm-slim",)
     elif target == "python":

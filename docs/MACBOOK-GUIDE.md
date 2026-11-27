@@ -127,6 +127,10 @@ Folders beginning with a dot are hidden in Finder; Command+Shift+Period toggles 
 
 ## Troubleshooting
 
+**History collector reports conflicting Thing contents.** The collector used to compare raw JSON hashes, so `10.0` and `10` (or `85.0` and `85`) incorrectly looked like different values at the same Ditto revision. The current collector compares JSON numbers by exact numeric value while preserving the originally stored JSON and model inputs. Genuine differences still fail visibly with the Thing ID, revision and differing fields. Update the source and run `bash macos/setup.sh` to rebuild the history image; running Start alone does not rebuild it. Existing databases do not need to be deleted or renamed.
+
+**Apps lose their Ditto connection after Docker or nginx restarts.** Startup now checks their shared network attachment and recreates only an app still attached to the old network. The database and mounted drafts are preserved. If readiness still fails, the launcher prints the collector health and recent history logs instead of hiding the underlying error.
+
 **Docker first-run screens are still open.** Finish them and leave Terminal open. If setup timed out, rerun Install-Mac.command. Repeating setup is supported.
 
 **Docker exists in a custom folder but is not detected.** Normal and Spotlight-registered locations are detected automatically. For an unregistered copy, run this from SmartBinDemo, replacing the example with its actual path:

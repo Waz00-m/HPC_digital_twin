@@ -23,6 +23,8 @@ case "$1 $2" in
   'image inspect')
     [ "${MOCK_IMAGE:-1}" = 1 ] || exit 1
     case "$4" in *fingerprint*) printf '%s\n' "$MOCK_FINGERPRINT" ;; *) echo linux/amd64 ;; esac ;;
+  'exec fixture-nginx'|'exec fixture-dashboard'|'exec fixture-simulator') printf 'net:[1]\n' ;;
+  'exec fixture-history') printf '%s\n' "${MOCK_HISTORY_NAMESPACE:-net:[1]}" ;;
 esac
 exit 0
 '''
@@ -136,6 +138,33 @@ class DockerReuseTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("did not replace", result.stderr)
         self.assertNotIn("compose --project-name", calls)
+
+    def app_start(self, **environment):
+        code = '''dc() {
+  printf 'dc %s\\n' "$*" >> "$CALLS"
+  if [ "$1" = ps ]; then
+    local last arg
+    for arg in "$@"; do last="$arg"; done
+    printf 'fixture-%s\\n' "$last"
+  fi
+}
+start_apps
+'''
+        return self.shell(code, **environment)
+
+    def test_running_apps_on_current_network_are_not_recreated(self):
+        result, calls = self.app_start()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("--force-recreate", calls)
+        self.assertIn("up -d --no-build --pull never dashboard simulator history", calls)
+
+    def test_restart_repairs_only_the_app_with_a_stale_network_attachment(self):
+        result, calls = self.app_start(MOCK_HISTORY_NAMESPACE="net:[2]")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--no-deps --no-build --pull never --force-recreate history", calls)
+        self.assertNotIn("--force-recreate dashboard", calls)
+        self.assertNotIn("--force-recreate simulator", calls)
+        self.assertNotIn("down", calls); self.assertNotIn("--volumes", calls)
 
 
 if __name__ == "__main__":

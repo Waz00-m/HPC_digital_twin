@@ -55,6 +55,32 @@ wait_ditto() {
     sleep 5
   done
 }
+start_apps() {
+  # A running sidecar keeps its network namespace if nginx restarts. Its
+  # container ID can stay the same, so Compose does not notice the stale join.
+  local parent parent_namespace service app app_namespace
+  parent="$(dc ps --status running --quiet nginx)"
+  [ -n "$parent" ] || die 'The nginx container is not running; cannot attach the app services.'
+  parent_namespace="$(docker_cli exec "$parent" readlink /proc/self/ns/net)" || die 'Could not inspect the running Ditto network.'
+  for service in dashboard simulator history; do
+    app="$(dc ps --status running --quiet "$service")"
+    [ -n "$app" ] || continue
+    app_namespace="$(docker_cli exec "$app" readlink /proc/self/ns/net 2>/dev/null || true)"
+    if [ "$app_namespace" != "$parent_namespace" ]; then
+      say "Rejoining $service to the current Ditto network; saved data is preserved"
+      dc up -d --no-deps --no-build --pull never --force-recreate "$service"
+    fi
+  done
+  dc up -d --no-build --pull never dashboard simulator history
+}
+check_pipeline() {
+  if dc exec -T dashboard node macos/check.mjs "$@"; then return 0; fi
+  say 'History connection diagnostics'
+  /usr/bin/curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4322/health || true
+  printf '\n'
+  dc logs --no-color --tail 30 history || true
+  die 'The history pipeline is not ready. The collector error and recent history logs are shown above; saved data was not reset.'
+}
 open_tools() {
   open 'http://127.0.0.1:4321/'
   open 'http://127.0.0.1:4318/'

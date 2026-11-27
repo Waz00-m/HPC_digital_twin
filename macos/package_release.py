@@ -15,11 +15,11 @@ required = ["Install-Mac.command", "Start-Mac.command", "Stop-Mac.command", "Sta
             "docs/SmartBin-MacBook-Guide.docx", "history/fetch_smartbin_data.py", "history/twin_history/reader.py"]
 raw = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "-z"])
 paths = sorted(set(raw.decode("utf-8").split("\0")) - {""})
-manifest = {"prepared_date": "2026-11-26", "root_folder": "SmartBinDemo", "files": []}
+manifest = {"prepared_date": "2026-11-27", "root_folder": "SmartBinDemo", "files": []}
 
 
 def add(archive, relative, data):
-    entry = zipfile.ZipInfo("SmartBinDemo/" + relative, (2026, 11, 26, 12, 0, 0))
+    entry = zipfile.ZipInfo("SmartBinDemo/" + relative, (2026, 11, 27, 12, 0, 0))
     entry.create_system = 3
     executable = relative.endswith((".sh", ".command"))
     entry.external_attr = (stat.S_IFREG | (0o755 if executable else 0o644)) << 16

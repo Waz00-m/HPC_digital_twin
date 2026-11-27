@@ -40,6 +40,25 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
+def same_json_value(left, right):
+    """Compare JSON values, treating 20 and 20.0 as the same number, not True.
+
+    Keep exact numeric equality; never round weights or conflate missing fields
+    with explicit null. Serialization formatting is not a new Thing version.
+    """
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is bool and type(right) is bool and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return left == right
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_json_value(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_json_value(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def finite(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
@@ -235,7 +254,13 @@ class Store:
             existing = con.execute("SELECT snapshot_id, content_hash FROM snapshots WHERE thing_id=? AND revision=?", (thing_id, revision)).fetchone()
             if existing:
                 if existing["content_hash"] != digest:
-                    raise ValueError("Conflicting Thing contents for the same Ditto revision.")
+                    previous_payload = json.loads(con.execute("SELECT thing_json FROM snapshots WHERE snapshot_id=?", (existing["snapshot_id"],)).fetchone()[0])
+                    if same_json_value(previous_payload, thing):
+                        return {"inserted": False, "snapshot_id": existing["snapshot_id"]}
+                    changed = sorted(key for key in set(previous_payload) | set(thing)
+                                     if key not in previous_payload or key not in thing or not same_json_value(previous_payload[key], thing[key]))
+                    raise ValueError("Conflicting Thing contents for " + thing_id + " at Ditto revision " + str(revision)
+                                     + "; differing fields: " + ", ".join(changed) + ". Existing history was preserved.")
                 return {"inserted": False, "snapshot_id": existing["snapshot_id"]}
             previous = con.execute("SELECT revision FROM latest_things WHERE thing_id=?", (thing_id,)).fetchone()
             cursor = con.execute("INSERT INTO snapshots (" + ",".join(columns) + ") VALUES (" + ",".join("?" for _ in columns) + ")", values)
